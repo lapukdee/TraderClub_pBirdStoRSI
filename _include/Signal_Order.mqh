@@ -209,17 +209,35 @@ class CSignal: public CChart
 
                                   int          method = MODE_SMA,       // averaging method
                                   int          price_field = 0          // price (Low/High or Close/Close)
-
                                  )
    {
       return NormalizeDouble(iStochastic(NULL, timeframe, exSig_STO_Kperiod, exSig_STO_Dperiod, exSig_STO_slowing, method, price_field, mode, shift), 4);
    }
-
+   double            inRSI(int          timeframe,    // timeframe
+                           int          shift         // shift
+                          )
+   {
+      return NormalizeDouble(iRSI(NULL, timeframe, exSig_RSI_Period, PRICE_CLOSE, shift), 2);
+   }
 public :
 
    int               Signal_Main()
    {
+      double   StoVal = inStochastic(exSig_TF, MODE_MAIN, 1);
+      double   RSIVal = inRSI(exSig_TF, 1);
 
+      if(StoVal >= exSig_STO_UP &&
+         RSIVal >= exSig_RSI_UP ) {
+
+         return   OP_BUY;
+
+      }
+      if(StoVal <= exSig_STO_DW &&
+         RSIVal <= exSig_RSI_DW) {
+
+         return   OP_SELL;
+
+      }
       return   -1;
    }
 
@@ -266,18 +284,35 @@ public:
    {
       return  NormalizeDouble(strat * MathPow(Multi, Liner), 2);
    }
-   int               OrderSend_Active(int   OP_DIR, int Magicnumber, double   lot, int  OrderLiner)
+   int               OrderSend_Active(int   OP_DIR, int Magicnumber, double   lot, double  TPp, double  SLp, int  OrderLiner)
    {
       string   OrderTagsCMM = ea_nameShort + "-" + string(OrderLiner);
 //---
       double   price = (OP_DIR == OP_BUY) ? Ask : Bid;
       price = NormalizeDouble(price, Digits);
 
+      TPp = NormalizeDouble(TPp * Point, Digits);
+      SLp = NormalizeDouble(SLp * Point, Digits);
+
+      double   TP = -1, SL = -1;
+      if(OP_DIR == OP_BUY) {
+         TP = NormalizeDouble(price + TPp, Digits);
+         SL = NormalizeDouble(price - SLp, Digits);
+      }
+      if(OP_DIR == OP_SELL) {
+         TP = NormalizeDouble(price - TPp, Digits);
+         SL = NormalizeDouble(price + SLp, Digits);
+      }
+      //---
+
       Print(__FUNCSIG__, " #", __LINE__, " OP_DIR: ", OP_DIR);
       Print(__FUNCSIG__, " #", __LINE__, " lot: ", lot);
       Print(__FUNCSIG__, " #", __LINE__, " price: ", price);
+      Print(__FUNCSIG__, " #", __LINE__, " TPp: ", TPp);
+      Print(__FUNCSIG__, " #", __LINE__, " SLp: ", SLp);
 
-      int ticket = OrderSend(Symbol(), OP_DIR, lot, price, 1, 0, 0, OrderTagsCMM, Magicnumber, 0);
+      int ticket = OrderSend(Symbol(), OP_DIR, lot, price, 1, SL, TP, OrderTagsCMM, Magicnumber);
+
       if(ticket < 0) {
          Print("OrderSend failed with error #", GetLastError());
       } else {
@@ -585,7 +620,31 @@ public:
       //OP_DirHoding            =  -1;
       //---
 
-      CChart_IsNewBar(exSig_TF);
+//--- Time
+      datetime Wacth  =  (TimeGMT() + exSig_Time_Carry * 3600);
+      int  _Hour = TimeHour(Wacth);
+      if(exSig_Time_Start <= _Hour && _Hour <= exSig_Time_End__) {
+
+         if(CChart_IsNewBar(exSig_TF)) {
+
+            if(Port.TotalTrades == 0) {
+               int   RES   =  Signal_Main();
+               if(RES != -1) {
+                  int   tik = OrderSend_Active(RES, exOrder_Magicnumber, exOrder_Lot, exOrder_TPp, exOrder_SLp, Port.TotalTrades);
+
+                  if(tik >= 0 &&
+                     exTest_OrderReason) {
+                     VLineCreate("Order_EntryPoint_" + string(iTime(NULL, 0, 0)), "Main_" + string(exSig_TF), 0);
+                  }
+
+               }
+            }
+
+         }
+
+      }
+
+
       //Order[OP_BUY]
       //Order[OP_SELL]
       //Port[]
@@ -599,8 +658,6 @@ public:
    {
       string   CMM   =  "\n";
       //CMM += "OP_DirHoding : " + string(OP_DirHoding) + "\n";
-      CMM += "Tailing_DistancePoint_BUY : " + string(Order[OP_BUY].Tailing_DistancePoint) + "\n";
-      CMM += "Tailing_DistancePoint_Sell : " + string(Order[OP_SELL].Tailing_DistancePoint) + "\n";
       CMM += "\n";
 
       CMM += "Port.Drawdown : " + DoubleToStr(Port.Drawdown, 2) + "\n";
@@ -609,9 +666,21 @@ public:
 
       CMM += "Balance : " + DoubleToStr(AccountBalance(), 2) + "\n";
       CMM += "Holding : " + DoubleToStr(AccountProfit(), 2) + "\n";
+      CMM += "\n";
+
+      //CMM += "TimeGMTOffset : " + TimeGMTOffset() + "\n";
+      //CMM += "\n";
+
+      CMM += "Time-GMT : " + TimeGMT() + "\n";
+      CMM += "Time-Local : " + TimeLocal() + "\n";
+      CMM += "\n";
+      CMM += "Time-XXXX : " + TimeToStr((TimeGMT() + exSig_Time_Carry * 3600), TIME_DATE | TIME_SECONDS) + "\n";
+
+      //CMM += "Time-Broker : " + TimeCurrent() + "\n";
+
+      //CMM += "Balance : " + DoubleToStr(AccountBalance(), 2) + "\n";
 
       Comment(CMM);
-
    }
    //---
 //   bool              Detect_TakeValue()
