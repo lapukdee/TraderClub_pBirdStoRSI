@@ -220,27 +220,68 @@ class CSignal: public CChart
       return NormalizeDouble(iRSI(NULL, timeframe, exSig_RSI_Period, PRICE_CLOSE, shift), 2);
    }
 public :
-
    int               Signal_Main()
    {
-      double   StoVal = inStochastic(exSig_TF, MODE_MAIN, 1);
-      double   RSIVal = inRSI(exSig_TF, 1);
 
-      if(StoVal >= exSig_STO_UP &&
-         RSIVal >= exSig_RSI_UP ) {
+      int   statement = 1;
+      switch(statement) {
+      case  1: {
 
-         return   OP_BUY;
+         double   StoVal_1 = inStochastic(exSig_TF, MODE_MAIN, 1);
+         double   StoVal_2 = inStochastic(exSig_TF, MODE_MAIN, 2);
 
+         double   RSIVal_1 = inRSI(exSig_TF, 1);
+         double   RSIVal_2 = inRSI(exSig_TF, 2);
+
+
+         if(StoVal_1 >= exSig_STO_UP &&
+            RSIVal_1 >= exSig_RSI_UP ) {
+
+            if(StoVal_1 > StoVal_2) {
+               return   OP_BUY;
+            }
+
+         }
+         if(StoVal_1 <= exSig_STO_DW &&
+            RSIVal_1 <= exSig_RSI_DW) {
+
+            if(StoVal_1 < StoVal_2) {
+               return   OP_SELL;
+            }
+
+         }
+
+         return   -1;
       }
-      if(StoVal <= exSig_STO_DW &&
-         RSIVal <= exSig_RSI_DW) {
+      //---
 
-         return   OP_SELL;
+      case  2: {
 
+         double   StoVal = inStochastic(exSig_TF, MODE_MAIN, 0);
+         double   RSIVal = inRSI(exSig_TF, 0);
+
+         if(StoVal >= exSig_STO_DW &&
+            RSIVal >= exSig_RSI_UP ) {
+
+            return   OP_BUY;
+
+         }
+         if(StoVal <= exSig_STO_UP &&
+            RSIVal <= exSig_RSI_DW) {
+
+            return   OP_SELL;
+
+         }
+
+         return   -1;
+      }
+      //---
+
+      default:
+         break;
       }
       return   -1;
    }
-
 };
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -625,22 +666,22 @@ public:
       int  _Hour = TimeHour(Wacth);
       if(exSig_Time_Start <= _Hour && _Hour <= exSig_Time_End__) {
 
-         if(CChart_IsNewBar(exSig_TF)) {
+         //if(CChart_IsNewBar(exSig_TF)) {
 
-            if(Port.TotalTrades == 0) {
-               int   RES   =  Signal_Main();
-               if(RES != -1) {
-                  int   tik = OrderSend_Active(RES, exOrder_Magicnumber, exOrder_Lot, exOrder_TPp, exOrder_SLp, Port.TotalTrades);
+         if(Port.TotalTrades == 0) {
+            int   RES   =  Signal_Main();
+            if(RES != -1) {
+               int   tik = OrderSend_Active(RES, exOrder_Magicnumber, exOrder_Lot, exOrder_TPp, exOrder_SLp, Port.TotalTrades);
 
-                  if(tik >= 0 &&
-                     exTest_OrderReason) {
-                     VLineCreate("Order_EntryPoint_" + string(iTime(NULL, 0, 0)), "Main_" + string(exSig_TF), 0);
-                  }
-
+               if(tik >= 0 &&
+                  exTest_OrderReason) {
+                  VLineCreate("Order_EntryPoint_" + string(iTime(NULL, 0, 0)), "Main_" + string(exSig_TF), 0);
                }
-            }
 
+            }
          }
+
+         //}
 
       }
 
